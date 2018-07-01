@@ -1,0 +1,29 @@
+{
+  "name": "gdax-trading-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc -p .",
+    "run": "npm run-script build && node build/index.js",
+    "pad": "echo first && echo second",
+    "clean": "rm -fr build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/hashmap": "^2.0.29",
+    "@types/pg": "7.4.9",
+    "gdax-trading-toolkit": "D:/gdax-tt",
+    "hashmap": "2.0.3",
+    "pg": "7.4.3"
+  },
+  "devDependencies": {
+    "ts-node": "^5.0.1",
+    "tslint": "^5.9.1",
+    "typedoc": "0.8.0",
+    "typescript": "^2.7.2"
+  }
+}

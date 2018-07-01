@@ -1,0 +1,26 @@
+{
+    "compilerOptions": {
+      "module": "commonjs",
+      "target": "es6",
+      "lib": ["es6", "es2016", "es2016.array.include", "dom", "es2017.object"],
+      "noImplicitAny": true,
+      "noImplicitReturns": true,
+      "noImplicitThis": true,
+      "noUnusedLocals": false,
+      "strictNullChecks": false,
+      "experimentalDecorators": true,
+      "outDir": "build",
+      "sourceMap": true,
+      "allowJs": false,
+      "skipLibCheck": true,
+      "allowUnusedLabels":true
+    },
+    "include": [
+      "types/*.d.ts",
+      "src/**/*.ts",
+      "test/**/*.ts"
+    ],
+    "exclude": [
+      "node_modules"
+    ]
+  }
