@@ -2,8 +2,7 @@ import { Pool, QueryResult, PoolClient, Query } from 'pg';
 import { BigJS } from 'gdax-trading-toolkit/build/src/lib/types';
 import { LiveOrder } from 'gdax-trading-toolkit/build/src/lib';
 import { TradeFinalizedMessage } from 'gdax-trading-toolkit/build/src/core';
-import bignumber, { BigNumber } from '../../gdax-tt/node_modules/bignumber.js';
-import { error } from 'shelljs';
+import { BigNumber } from 'gdax-trading-toolkit/node_modules/bignumber.js';
 
 interface HoldingValueTracker {
     ref_point: number;
@@ -29,18 +28,18 @@ export class OrderStore {
     }
 
     public markOrderDone(order: TradeFinalizedMessage): Promise<QueryResult> {
-        return this.pool.connect().then((client:PoolClient)=>{
-          return client.query('Select done_order($1,$2)', [order.orderId, Number(order.remainingSize)]).then((q:QueryResult)=>{
-              client.release();
-              return Promise.resolve(q);
-          }).catch((err:Error)=>{
-            return Promise.reject(err);
-            });  
+        return this.pool.connect().then((client: PoolClient) => {
+            return client.query('Select done_order($1,$2)', [order.orderId, Number(order.remainingSize)]).then((q: QueryResult) => {
+                client.release();
+                return Promise.resolve(q);
+            }).catch((err: Error) => {
+                return Promise.reject(err);
+            });
         });
     }
 
-    public addQuantity(orderId: string, quantity: string): Promise<QueryResult> {
-        return this.pool.query('Select add_quantity($1,$2)', [orderId, Number(quantity)]);
+    public addQuantity(price: string, quantity: string): Promise<QueryResult> {
+        return this.pool.query('Select add_quantity($1,$2)', [price, quantity]);
     }
 
     private subtractQuantity(refPoint: BigJS, quantity: BigJS): Promise<QueryResult> {
@@ -127,22 +126,26 @@ export class OrderStore {
         });
     }
 
-    public buyOrder(quoteQuantity: BigJS,makeOrder: (quantity: BigJS) => Promise<Number>): Promise<void> {
+    public buyOrder(quoteQuantity: BigJS, makeOrder: (quantity: BigJS) => Promise<Number>): Promise<void> {
         if (quoteQuantity.lessThanOrEqualTo(0))
             return Promise.reject(new Error("man give me greater than zero"));
 
         return this.pool.connect().then((client: PoolClient) => {
             return client.query('BEGIN').then((result: QueryResult) => {
-                return client.query('SELECT sub_quote_quantity($1)', [quoteQuantity.toString()]);
+                return client.query('SELECT sub_quote_quantity($1)', [quoteQuantity.toFixed(2)]);
             }).then((result: QueryResult) => {
                 //make An order here!
-                return makeOrder(new BigNumber(result.rows[0].sub_quote_quantity)).then((x:Number)=>{
-                    return client.query('update configuration set quote_quantity=quote_quantity+($1) where id=1',[x.toFixed(2)]).then(()=>{
+                return makeOrder(new BigNumber(result.rows[0].sub_quote_quantity)).then((x: Number) => {
+                    if (x > 0) {
+                        return client.query('update configuration set quote_quantity=quote_quantity+($1) where id=1', [x.toFixed(2)]).then(() => {
+                            return Promise.resolve();
+                        }).catch((err: Error) => {
+                            console.error("Error:" + err.stack);
+                            return Promise.resolve();
+                        });
+                    }
+                    else 
                         return Promise.resolve();
-                    }).catch((err:Error)=>{
-                        console.error("Error:"+err.stack);
-                        return Promise.resolve();
-                    });
                 });
             }).then(() => {
                 return client.query('COMMIT').then(() => {
@@ -160,15 +163,15 @@ export class OrderStore {
                     return Promise.reject(err);
                 })
             });
-        }).catch((err:Error) => {
+        }).catch((err: Error) => {
             console.error('Error', err.message);
         });
     }
 
-    public printHoldings(){
+    public printHoldings() {
         this.pool.query('select c.quote_quantity,sum(h.quantity) base_quantity from holdings_value_tracker h,configuration c group by c.quote_quantity').then(
-            (result:QueryResult)=>{
-                console.log("Current Holdings: "+JSON.stringify(result.rows[0]));
+            (result: QueryResult) => {
+                console.log("Current Holdings: " + JSON.stringify(result.rows[0]));
             });
     }
 }

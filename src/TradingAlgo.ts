@@ -5,9 +5,9 @@ import { OrderManager } from "./OrderManager"
 import { ExchangeFeedConfig, GDAXFeed } from 'gdax-trading-toolkit/build/src/exchanges';
 import * as GTT from 'gdax-trading-toolkit';
 import { TraderConfig } from 'gdax-trading-toolkit/build/src/core';
-import { BigJS } from '../../gdax-tt/build/src/lib/types';
-import { BigNumber } from '../../gdax-tt/node_modules/bignumber.js';
-import { tempdir } from 'shelljs';
+import { BigJS } from 'gdax-trading-toolkit/build/src/lib/types';
+import { BigNumber } from 'gdax-trading-toolkit/node_modules/bignumber.js';
+import { setTimeout } from 'timers';
 
 class RefPoint {
     price: BigJS;
@@ -35,7 +35,7 @@ export class TradingAlgo {
     private readonly algoConfig: AlgoConfig;
     private logger: any;
     private initAlgo: boolean = false;
-    private i:number=0;
+    private i: number = 0;
     constructor(config: AlgoConfig) {
         this.algoConfig = config;
         this.logger = this.algoConfig.logger;
@@ -83,20 +83,20 @@ export class TradingAlgo {
                             this.initRefPoint = true;
                             return;
                         }
-                                                
+
                         if ((this.currRefPoint.price.sub(ticker.price).abs().greaterThanOrEqualTo(Settings.pdFilter))) {
                             if (!msg.time)
                                 return;
-                            
-                            if(ticker.time.getTime()-this.currRefPoint.time.getTime()<=0){
-                                if(ticker.time.getTime()-this.currRefPoint.time.getTime()<0)
-                                    this.logger.log('error',"Ticker time is equal less than currentRefPoint so returning");
+
+                            if (ticker.time.getTime() - this.currRefPoint.time.getTime() <= 0) {
+                                if (ticker.time.getTime() - this.currRefPoint.time.getTime() < 0)
+                                    this.logger.log('error', "Ticker time is equal less than currentRefPoint so returning");
                                 else
-                                    this.logger.log('debug',"Ticker time is equal to currentRefPoint so returning");
-                                
+                                    this.logger.log('debug', "Ticker time is equal to currentRefPoint so returning");
+
                                 return;
                             }
-                           
+
                             this.setNewRefPoint(ticker.price, msg.time);
                             this.initiateAlgo();
                             return;
@@ -117,8 +117,9 @@ export class TradingAlgo {
         this.prevRefPoint.time = this.currRefPoint.time;
         this.currRefPoint.price = price;
         this.currRefPoint.time = time;
-        this.logger.log('info', `Setting new Reference point to, Price:${this.currRefPoint.price}, Time:${this.currRefPoint.time}`);
-    }
+        this.logger.log('info', `Setting new Reference point to amin, Price:${this.currRefPoint.price}, Time:${this.currRefPoint.time}`);
+        this.orderManager.cancelAllOrders();
+       }
 
     private initiateAlgo() {
         this.logger.log('info', "Initiating Algo");
@@ -128,34 +129,34 @@ export class TradingAlgo {
         if (slope.lessThan(0)) {
             beta = this.calcBeta(slope.abs(), Settings.sellSettings, this.buyEquation);
             side = "buy";
-            this.initiateOrder(Settings.buySettings,side,beta);
-        
+            this.initiateOrder(Settings.buySettings, side, beta);
+
         }
-        else if(slope.greaterThan(0))  {
+        else if (slope.greaterThan(0)) {
             beta = this.calcBeta(slope.abs(), Settings.buySettings, this.sellEquation);
             side = "sell";
-            this.initiateOrder(Settings.sellSettings,side,beta);
+            this.initiateOrder(Settings.sellSettings, side, beta);
         }
-        
+
         this.logger.log("info", `${side} with ${beta}`);
     }
 
     private initiateOrder(settings: any, side: string, beta: BigJS) {
-        if(beta.greaterThan(1))
-            beta=new BigNumber(1);
-        else if(beta.lessThan(0))
-            beta=new BigNumber(0);
-            
+        if (beta.greaterThan(1))
+            beta = new BigNumber(1);
+        else if (beta.lessThan(0))
+            beta = new BigNumber(0);
+
         var quantity: BigJS = beta.mul(settings.maxTradeQuantity);
-        var makeOrder:boolean =false;
-        if(side==='buy'){
-            if(quantity.div(this.currRefPoint.price).greaterThanOrEqualTo(Settings.minAmountBase))
-                makeOrder=true; 
+        var makeOrder: boolean = false;
+        if (side === 'buy') {
+            if (quantity.div(this.currRefPoint.price).greaterThanOrEqualTo(Settings.minAmountBase))
+                makeOrder = true;
         }
 
-        else if(side==='sell'){
-           if(quantity.greaterThanOrEqualTo(Settings.minAmountBase))
-                makeOrder=true;
+        else if (side === 'sell') {
+            if (quantity.greaterThanOrEqualTo(Settings.minAmountBase))
+                makeOrder = true;
         }
 
         if (makeOrder) {
@@ -165,8 +166,8 @@ export class TradingAlgo {
 
     private calculateSlope(): BigJS {
         this.logger.log('debug', `Caluclating slope between ${JSON.stringify(this.currRefPoint)} and ${JSON.stringify(this.prevRefPoint)}`);
-        this.logger.log('info',`t2:${this.currRefPoint.time.getTime()}, t1(prev):${this.prevRefPoint.time.getTime()}`);
-     
+        this.logger.log('info', `t2:${this.currRefPoint.time.getTime()}, t1(prev):${this.prevRefPoint.time.getTime()}`);
+
         // Time will be in Seconds
         var num: BigJS = new BigNumber(this.currRefPoint.time.getTime()).sub(this.prevRefPoint.time.getTime());
         var slope = this.currRefPoint.price.sub(this.prevRefPoint.price);

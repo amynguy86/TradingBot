@@ -5,10 +5,10 @@ import { TraderConfig } from 'gdax-trading-toolkit/build/src/core/Trader';
 import { Trader, TradeExecutedMessage, TradeFinalizedMessage, PlaceOrderMessage } from "gdax-trading-toolkit/build/src/core";
 import { LiveOrder } from "gdax-trading-toolkit/build/src/lib";
 import { OrderStore } from './OrderStore';
-import { BigNumber } from '../../gdax-tt/node_modules/bignumber.js';
-import { LiveOrderbook } from '../../gdax-tt/build/src/core/LiveOrderbook';
-import { ErrorMessage } from '../../gdax-tt/build/src/core/Messages';
-import {OrderResult}from '../../gdax-tt/node_modules/gdax';
+import { BigNumber } from 'gdax-trading-toolkit/node_modules/bignumber.js';
+import { LiveOrderbook } from 'gdax-trading-toolkit/build/src/core/LiveOrderbook';
+import { ErrorMessage } from 'gdax-trading-toolkit/build/src/core/Messages';
+import {OrderResult}from 'gdax-trading-toolkit/node_modules/gdax';
 import { Query, QueryResult } from 'pg';
 import HashMap=require('hashmap');
 
@@ -22,10 +22,11 @@ export class OrderManager {
     constructor(traderConfig: TraderConfig, feed: ExchangeFeed, product: string) {
         this.logger = traderConfig.logger;
         this.trader = new Trader(traderConfig);
+        //The trader code does not read fitOrder propery from config
+        this.trader.fitOrders=traderConfig.fitOrders;
         this.product = product;
-        feed.pipe(this.trader);
         this.liveOrderbook= new LiveOrderbook({product:this.product,logger:this.logger});
-        feed.pipe(this.liveOrderbook);
+        feed.pipe(this.liveOrderbook).pipe(this.trader); //This fixed the memory issues, live order now has something to pipe to
         this.setUpTrader();
         this.postOnlyOrdersMap = new HashMap();
     }
@@ -37,7 +38,7 @@ export class OrderManager {
         this.trader.on('Trader.trade-executed', (msg: TradeExecutedMessage) => {
             this.logger.log('info', 'Trade executed', JSON.stringify(msg));
             if (msg.side === 'buy')
-                OrderStore.getInstance().addQuantity(msg.orderId, msg.tradeSize).catch((err: Error) => {
+                OrderStore.getInstance().addQuantity(msg.price, msg.tradeSize).catch((err: Error) => {
                     this.logger.log('error', err.stack);
                 });
         });
@@ -76,6 +77,7 @@ export class OrderManager {
     Sell "size" much eth/crypto for under or equal to the ref Point they were bought at
     */
     public sellOrder(size: BigJS, price: BigJS,refPoint:BigJS) {
+        this.logger.log('info',`OrderManager, selling size:${size}, price:${price}, refPoint:${refPoint}`);
         OrderStore.getInstance().sellOrder(size, refPoint, (quantity: BigJS, refPoint: BigJS) :Promise<BigJS> => {
             let placeOrderMessage = {
                 type: 'placeOrder',
@@ -83,8 +85,8 @@ export class OrderManager {
                 side: 'sell',
                 orderType: 'limit',
                 postOnly: true,
-                size: quantity.toFixed(Settings.decimalPlaces).toString(),
-                price: price.toFixed(2).toString()
+                size: quantity.toFixed(Settings.decimalPlaces),
+                price: price.toFixed(2)
             };
 
             return this.trader.placeOrder(placeOrderMessage as PlaceOrderMessage).then((order: LiveOrder) => {
@@ -115,21 +117,23 @@ export class OrderManager {
     Size of $ worth of eth to Buy at the Price given
     */
     public buyOrder(size: BigJS, price: BigJS,refPoint:BigJS) {
+        this.logger.log('info',`OrderManager, Buying size:${size}, price:${price}, refPoint:${refPoint}`);
         OrderStore.getInstance().buyOrder(size,(sizeReturned:BigJS):Promise<Number> =>{
             let baseQuantity:BigJS=sizeReturned.dividedBy(price);
-            let leftOverCash=sizeReturned.minus(baseQuantity.round(2).mul(price)).toNumber();
             let placeOrderMessage = {
                 type: 'placeOrder',
                 productId: this.product,
                 side: 'buy',
                 orderType: 'limit',
                 postOnly: true,
-                size: baseQuantity.toFixed(Settings.decimalPlaces).toString(),
-                price: price.toFixed(2).toString()
+                size: baseQuantity.toFixed(Settings.decimalPlaces),
+                price: price.toFixed(2)
             };
-    
+
           return  this.trader.placeOrder(placeOrderMessage as PlaceOrderMessage).then((order: LiveOrder) => {
                 this.logger.log('info', `Order Placed, OrderId: ${JSON.stringify(order)}`);
+                let leftOverCash=sizeReturned.minus(order.size.mul(order.price)).toNumber();
+                leftOverCash= leftOverCash<0.01? 0 : leftOverCash;
                 //Add to orderStore
                 if (order !== null){
                     OrderStore.getInstance().insertNewOrder(refPoint, order).then((Query:QueryResult)=>{

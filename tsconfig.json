@@ -18,7 +18,8 @@
     "include": [
       "types/*.d.ts",
       "src/**/*.ts",
-      "test/**/*.ts"
+      "test/**/*.ts",
+      "examples/**/*.ts"
     ],
     "exclude": [
       "node_modules"

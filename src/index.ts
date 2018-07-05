@@ -11,10 +11,10 @@ const auth = {
 
 const config: GDAXFeedConfig = {
     auth: auth,
-    wsUrl: "wss://ws-feed.gdax.com",
+    wsUrl: "wss://ws-feed.pro.coinbase.com",
     //wsUrl: "wss://ws-feed-public.sandbox.gdax.com",
     channels: ['user','ticker', 'heartbeat','level2'],
-    apiUrl: "https://api.gdax.com",
+    apiUrl: "https://api.pro.coinbase.com",
     // apiUrl: "https://api-public.sandbox.gdax.com",
     logger: logger
 };
