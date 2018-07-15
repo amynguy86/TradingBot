@@ -18,7 +18,8 @@
     "@types/pg": "7.4.9",
     "gdax-trading-toolkit": "D:/gdax-tt",
     "hashmap": "2.0.3",
-    "pg": "7.4.3"
+    "pg": "7.4.3",
+    "@types/superagent": "2.0.35"
   },
   "devDependencies": {
     "ts-node": "^5.0.1",

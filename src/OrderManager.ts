@@ -90,7 +90,6 @@ export class OrderManager {
             };
 
             return this.trader.placeOrder(placeOrderMessage as PlaceOrderMessage).then((order: LiveOrder) => {
-                this.logger.log('info', `Order Placed, OrderId: ${JSON.stringify(order)}`);
                 this.logger.log('info', `${JSON.stringify(this.trader.state())}`);
                 //Add to orderStore
                 if (order !== null) {

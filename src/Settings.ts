@@ -11,7 +11,7 @@ export class Settings{
         slopeMax:1.15e-5,//$1 per millisecond
         tradeRateMin: 0.30, //in $ rate;
         tradeRateMax: 0.80,
-        maxTradeQuantity:100 //in $
+        maxTradeQuantity:150 //in $
     };
 
     static sellSettings:any= {
@@ -19,6 +19,6 @@ export class Settings{
         slopeMax:1.15e-5,//$1 per millisecond
         tradeRateMin: 0.30, //in $ rate;
         tradeRateMax: 0.80,
-        maxTradeQuantity:0.20 //in eth
+        maxTradeQuantity:0.25 //in eth
     };
 }
