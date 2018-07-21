@@ -58,8 +58,7 @@ export class OrderManager {
             //todo, tries infinite number of times, that is because I have no way of knowing how many times retries happenned,
             //Hopefully the order will eventually go through, we may result in a loss but thats Ok for now
             if((result as any).reject_reason ==='post only'){
-                
-                setImmediate(()=>{
+                setTimeout(()=>{
                     this.logger.log('error',"Order Rejected because of POST_ONLY, Trying Again: price:"+msg.meta.price);
                     //ReferencePoint is just being given as current price, because this was the price the order got rejected
                     if(result.side==='buy'){
@@ -68,7 +67,7 @@ export class OrderManager {
                     else if(result.side==='sell'){
                         this.makeOrder(result.side,new BigNumber(result.size),new BigNumber(result.price));
                     }
-                });
+                },2000);
             }
         });
     }
@@ -91,14 +90,15 @@ export class OrderManager {
 
             return this.trader.placeOrder(placeOrderMessage as PlaceOrderMessage).then((order: LiveOrder) => {
                 this.logger.log('info', `${JSON.stringify(this.trader.state())}`);
-                //Add to orderStore
+                this.logger.log(`info`,`Placing Sell Order as Part of Transaction(size:${size}, price:${price}, refPoint:${refPoint}), Param:(quantity:${quantity},refpoint:${refPoint})`);
+                //Add to orderStore, dont care if add is succesfull(avoids deadlock due to clients running out)
                 if (order !== null) {
-                    return OrderStore.getInstance().insertNewOrder(refPoint, order).then(() => {
-                        return Promise.resolve(order.size);
+                    OrderStore.getInstance().insertNewOrder(refPoint, order).then(() => {
+                        this.logger.log('info',"Sell Order Added");
                     }).catch((err: Error) => {
                         this.logger.log('error', err.stack);
-                        return Promise.resolve(order.size);
                     });
+                    return Promise.resolve(order.size);
                 }
                 else {
                     return Promise.reject("Order Placement Failed");
@@ -108,7 +108,7 @@ export class OrderManager {
                 return Promise.reject("Order Placement Failed");
             });
         }).then((x:BigJS)=>{
-            this.logger.log('info',`Total Order Size:${x}`);
+            this.logger.log('info',`Total Order Size(Sell):${x}, size:${size}, price:${price}, refPoint:${refPoint}`);
             OrderStore.getInstance().printHoldings();
         });
     }
@@ -130,11 +130,11 @@ export class OrderManager {
             };
 
           return  this.trader.placeOrder(placeOrderMessage as PlaceOrderMessage).then((order: LiveOrder) => {
-                this.logger.log('info', `Order Placed, OrderId: ${JSON.stringify(order)}`);
                 let leftOverCash=sizeReturned.minus(order.size.mul(order.price)).toNumber();
                 leftOverCash= leftOverCash<0.01? 0 : leftOverCash;
                 //Add to orderStore
                 if (order !== null){
+                    this.logger.log('info', `Order Placed, OrderId: ${JSON.stringify(order)}`);
                     OrderStore.getInstance().insertNewOrder(refPoint, order).then((Query:QueryResult)=>{
                         this.logger.log('info',"Order Added");
                     }).catch((err: Error) => {
@@ -144,6 +144,7 @@ export class OrderManager {
                     return Promise.resolve(leftOverCash); //Dont care if insert into database fails
                 }
                 else{
+                    this.logger.log('info', `Buy Order Failed`);
                     return Promise.reject(new Error("Failed to place Order"));
                     }
             }).catch((err: Error) => {
