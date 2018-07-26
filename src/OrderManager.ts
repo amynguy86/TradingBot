@@ -17,7 +17,7 @@ export class OrderManager {
     private logger: any;
     private product: string;
     private liveOrderbook: LiveOrderbook;
-    private postOnlyOrdersMap: HashMap<string,Number>;
+    private postOnlyOrdersRetryMap: HashMap<string,Number>;
 
     constructor(traderConfig: TraderConfig, feed: ExchangeFeed, product: string) {
         this.logger = traderConfig.logger;
@@ -28,7 +28,7 @@ export class OrderManager {
         this.liveOrderbook= new LiveOrderbook({product:this.product,logger:this.logger});
         feed.pipe(this.liveOrderbook).pipe(this.trader); //This fixed the memory issues, live order now has something to pipe to
         this.setUpTrader();
-        this.postOnlyOrdersMap = new HashMap();
+        this.postOnlyOrdersRetryMap = new HashMap();
     }
 
     private setUpTrader() {
@@ -88,10 +88,12 @@ export class OrderManager {
                 price: price.toFixed(2)
             };
 
+
             return this.trader.placeOrder(placeOrderMessage as PlaceOrderMessage).then((order: LiveOrder) => {
                 this.logger.log('info', `${JSON.stringify(this.trader.state())}`);
                 this.logger.log(`info`,`Placing Sell Order as Part of Transaction(size:${size}, price:${price}, refPoint:${refPoint}), Param:(quantity:${quantity},refpoint:${refPoint})`);
                 //Add to orderStore, dont care if add is succesfull(avoids deadlock due to clients running out)
+                //BUG:Order complete may come before insertNewOrder happens(unlikely)
                 if (order !== null) {
                     OrderStore.getInstance().insertNewOrder(refPoint, order).then(() => {
                         this.logger.log('info',"Sell Order Added");
@@ -101,14 +103,15 @@ export class OrderManager {
                     return Promise.resolve(order.size);
                 }
                 else {
-                    return Promise.reject("Order Placement Failed");
+                    return Promise.reject(new Error("Order Placement Failed"));
                 }
             }).catch((err: Error) => {
                 this.logger.log('Here error', err.message);
-                return Promise.reject("Order Placement Failed");
+                return Promise.reject(new Error("Order Placement Failed"));
             });
-        }).then((x:BigJS)=>{
-            this.logger.log('info',`Total Order Size(Sell):${x}, size:${size}, price:${price}, refPoint:${refPoint}`);
+        }).then((x:BigJS[])=>{
+            var totalOrderSize = x.reduce((accumulator:BigJS,y:BigJS)=>accumulator.add(y),new BigNumber(0));
+            this.logger.log('info',`Total Order Size(Sell):${totalOrderSize}, size:${size}, price:${price}, refPoint:${refPoint}`);
             OrderStore.getInstance().printHoldings();
         });
     }
@@ -171,6 +174,7 @@ export class OrderManager {
 
     public cancelAllOrders():void{
         //Todo get this list from the database, not in memory
+        this.postOnlyOrdersRetryMap.clear();
         this.trader.cancelMyOrders().then((ids)=>{
             this.logger.log('debug',`Following orders were cancelled: ${ids}`)
         }).catch((err:Error)=>{

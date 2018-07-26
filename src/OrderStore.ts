@@ -3,6 +3,7 @@ import { BigJS } from 'gdax-trading-toolkit/build/src/lib/types';
 import { LiveOrder } from 'gdax-trading-toolkit/build/src/lib';
 import { TradeFinalizedMessage } from 'gdax-trading-toolkit/build/src/core';
 import { BigNumber } from 'gdax-trading-toolkit/node_modules/bignumber.js';
+import { setInterval } from 'timers';
 
 interface HoldingValueTracker {
     ref_point: number;
@@ -54,7 +55,8 @@ export class OrderStore {
         return this.pool.query('SELECT ref_point, quantity FROM public.holdings_value_tracker where ref_point < ($1) and quantity >0 order by ref_point', [maxRefPoint.toString()]);
     }
 
-    public createOrderTransaction(refPoint: BigJS, orderSize: BigJS, totalOrderSize: BigJS, makeOrder: (quantity: BigJS, refPoint: BigJS) => Promise<BigJS>): Promise<BigJS> {
+    public createOrderTransaction(refPoint: BigJS, orderSize: BigJS, makeOrder: (quantity: BigJS, refPoint: BigJS) => Promise<BigJS>): Promise<BigJS> {
+        var totalOrderSize:BigJS = new BigNumber(0);
         if (orderSize.lessThanOrEqualTo(0))
             return Promise.resolve(totalOrderSize);
 
@@ -94,9 +96,10 @@ export class OrderStore {
       TODO(Improvement): Do recursve Chaining, because getAllRefPoint may return incorrect values for the data it contains(If parallel Bots are Started)
       CON: Stack Overflow!!
      */
-    public sellOrder(orderSize: BigJS, maxRefPoint: BigJS, makeOrder: (quantity: BigJS, refPoint: BigJS) => Promise<BigJS>): Promise<BigJS> {
+    public sellOrder(orderSize: BigJS, maxRefPoint: BigJS, makeOrder: (quantity: BigJS, refPoint: BigJS) => Promise<BigJS>): Promise<BigJS[]> {
         return this.getAllRefPoints(maxRefPoint).then((q: QueryResult) => {
             var promiseToReturn: Promise<BigJS> = Promise.resolve(new BigNumber(0));
+            var promises: Promise<BigJS>[]=[];// = Promise.resolve(new BigNumber(0));
             var remainingSize: BigJS = new BigNumber(orderSize);
             for (let tmp of q.rows) {
                 let value: HoldingValueTracker = {
@@ -114,13 +117,10 @@ export class OrderStore {
                 if (valueToOrder.lessThanOrEqualTo(0)) {
                     break;
                 }
-                promiseToReturn = promiseToReturn.then((currentOrderSize: BigJS) => {
-                    return this.createOrderTransaction(new BigNumber(value.ref_point.toString()), new BigNumber(valueToOrder), currentOrderSize, makeOrder);
-                });
-
+                promises.push(this.createOrderTransaction(new BigNumber(value.ref_point.toString()), new BigNumber(valueToOrder), makeOrder));
                 remainingSize = remainingSize.minus(valueToOrder);
             };
-            return promiseToReturn;
+            return Promise.all(promises);
         }).catch((err: Error) => {
             return Promise.reject(err);
         });
@@ -176,9 +176,10 @@ export class OrderStore {
     }
 }
 
+
 /*
-BigNumber.config({ ERRORS: true });
-OrderStore.getInstance().sellOrder(new BigNumber(0.14), new BigNumber(900), (quant: BigJS, refPoint: BigJS) => {
+setInterval(()=>{
+OrderStore.getInstance().sellOrder(new BigNumber(90), new BigNumber(900), (quant: BigJS, refPoint: BigJS) => {
     console.log("Making Order:" + quant + "Ref:" + refPoint)
     return Promise.resolve(quant).then(() => {
         var order = {
@@ -190,17 +191,23 @@ OrderStore.getInstance().sellOrder(new BigNumber(0.14), new BigNumber(900), (qua
             status: 'almost',
             extra: ''
         };
-        console.log(":HERE,REF:" + refPoint);
-        return OrderStore.getInstance().insertNewOrder(refPoint, order as LiveOrder).then(() => {
+        console.log(`MADKING ORDER, Quant:${quant}, refPoint:${refPoint}`);
+        //    if(refPoint.equals(100))
+          //      return Promise.reject(new Error("fail"));
+            return Promise.resolve(quant);
+        /*
+            return OrderStore.getInstance().insertNewOrder(refPoint, order as LiveOrder).then(() => {
             // return test(refPoint).then(()=>{
-            console.log("PK");
-            return Promise.resolve(new BigNumber(0.01));
         });
+        
     });
 }).then((x) => {
-    console.log(`TOTAL ORDER:${x}`);
+    var totalOrderSize = x.reduce((accumulator:BigJS,y:BigJS)=>accumulator.add(y),new BigNumber(0));
+    console.log(`TOTAL ORDER:${totalOrderSize}`);
 });
+},1000);
 
+/*
 function test(param: BigJS): Promise<BigJS> {
     var x: BigJS = param;
     console.log(x.toNumber());
