@@ -17,8 +17,7 @@ export class OrderManager {
     private logger: any;
     private product: string;
     private liveOrderbook: LiveOrderbook;
-    private postOnlyOrdersRetryMap: HashMap<string,Number>;
-
+    
     constructor(traderConfig: TraderConfig, feed: ExchangeFeed, product: string) {
         this.logger = traderConfig.logger;
         this.trader = new Trader(traderConfig);
@@ -28,7 +27,6 @@ export class OrderManager {
         this.liveOrderbook= new LiveOrderbook({product:this.product,logger:this.logger});
         feed.pipe(this.liveOrderbook).pipe(this.trader); //This fixed the memory issues, live order now has something to pipe to
         this.setUpTrader();
-        this.postOnlyOrdersRetryMap = new HashMap();
     }
 
     private setUpTrader() {
@@ -174,7 +172,6 @@ export class OrderManager {
 
     public cancelAllOrders():void{
         //Todo get this list from the database, not in memory
-        this.postOnlyOrdersRetryMap.clear();
         this.trader.cancelMyOrders().then((ids)=>{
             this.logger.log('debug',`Following orders were cancelled: ${ids}`)
         }).catch((err:Error)=>{
