@@ -34,6 +34,7 @@ export class OrderStore {
                 client.release();
                 return Promise.resolve(q);
             }).catch((err: Error) => {
+                client.release();
                 return Promise.reject(err);
             });
         });
