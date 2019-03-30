@@ -1,4 +1,4 @@
-import { Settings } from './Settings';
+import { Settings } from '../config/Settings';
 import { BigJS } from 'gdax-trading-toolkit/build/src/lib/types';
 import { ExchangeFeed } from 'gdax-trading-toolkit/build/src/exchanges';
 import { TraderConfig } from 'gdax-trading-toolkit/build/src/core/Trader';

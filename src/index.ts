@@ -1,6 +1,6 @@
 import * as GTT from 'gdax-trading-toolkit';
 import { GDAXFeedConfig } from "gdax-trading-toolkit/build/src/exchanges";
-import { TradingAlgo, AlgoConfig } from './TradingAlgo';
+import { TradingAlgo, AlgoConfig } from './volatilityTradingAlgo/algo/TradingAlgo';
 
 const logger = GTT.utils.ConsoleLoggerFactory({ level: 'debug' });
 const auth = {
